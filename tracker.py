@@ -25,5 +25,5 @@ class Tracker(object):
                 addr, name, num_cycles
             ))
 
-    def get_num_cycles():
+    def get_num_cycles(self):
         return self.num_cycles
