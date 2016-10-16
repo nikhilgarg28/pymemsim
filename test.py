@@ -5,7 +5,7 @@ from pymemsim import Store, memory
 
 class TestStore(object):
     def setup(self):
-        self.t = pymemsim.Tracker()
+        self.t = pymemsim.Tracker(detailed=True)
 
     def get_many_stores(self):
         ret = [

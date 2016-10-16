@@ -1,19 +1,25 @@
+from collections import defaultdict
+import pyutils.timekeeper
+
+timekeeper = pyutils.timekeeper.TimeKeeper()
 
 class Tracker(object):
-    def __init__(self, verbose=False):
+    def __init__(self, detailed=False, verbose=False):
         self.clear()
         self.verbose = verbose
+        self.detailed = detailed
 
     def clear(self):
         self.num_cycles = 0
         self.events = []
-        self.sources = {}
+        self.sources = defaultdict(int)
 
     def track(self, name, addr, read, num_cycles, hit=None):
+        self.sources[name] += num_cycles
         self.num_cycles += num_cycles
-        self.events.append((name, addr, read, hit))
-        old = self.sources.get(name, 0)
-        self.sources[name] = old + num_cycles
+
+        if self.detailed:
+            self.events.append((name, addr, read, hit))
         if not self.verbose:
             return
         if read:

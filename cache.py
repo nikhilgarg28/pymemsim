@@ -69,20 +69,21 @@ class Store(object):
         """Reads size bytes starting at address addr."""
         ret = []
 
-        loop = True
-        while loop:
-            _, _, offset = self._decompose(addr)
+        while size > 0:
             block = self._load_block(addr)
-
+            offset = addr - block.base
             n_read = self.block_size - offset
-            if n_read < size:
-                addr, size = addr + n_read, size - n_read
-                this = block.read(offset)
-            else:
-                this = block.read(offset, offset+size)
-                loop = False
 
-            ret.extend(this)
+            less = size if size < n_read else n_read
+            end = offset + less
+            addr += n_read
+            size -= n_read
+            this = block.read(offset, end)
+
+            if not ret:
+                ret = this
+            else:
+                ret.extend(this)
 
         if len(ret) == 1:
             return ret[0]
@@ -191,10 +192,13 @@ class Store(object):
         return Block(self.block_size, base, buf)
 
     def _decompose(self, addr):
-        offset = _get_bits(addr, self._n_offset, 0)
-        set_index = _get_bits(addr, self._n_set, self._n_offset)
-        tag = _get_bits(addr, self._n_tag, self._n_offset + self._n_set)
-        return tag, set_index, offset
+        offset = addr & ((1 << self._n_offset) - 1)
+        addr = addr >> self._n_offset
+
+        set_index = addr & ((1 << self._n_set) - 1)
+        addr = addr >> self._n_set
+
+        return addr, set_index, offset
 
     def _track(self, addr, read, hit=None):
         if self.tracker:
@@ -210,9 +214,3 @@ class Store(object):
             self._write_block(addr, block)
             addr += n_write
             buf = buf[n_write:]
-
-
-def _get_bits(addr, n_bits, to_discard):
-    addr = addr >> to_discard
-    mask = (1 << n_bits) - 1
-    return addr & mask
