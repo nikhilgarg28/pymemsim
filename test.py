@@ -159,4 +159,3 @@ class TestStore(object):
         # level 2
         s1.write(2, [1, 2])
         verify(3*cost1 + 3*cost2)
-
