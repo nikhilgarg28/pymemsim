@@ -9,10 +9,10 @@ class TestStore(object):
     def get_many_stores(self):
         return [
             # fully associative, write through, no backing
-            Store('test', 1, 2, 1, tracker=self.t),
+            Store('test', 1, 2, 1, tracker=self.t, write_through=True),
 
             # 2-set associative, write through, with no backing
-            Store('test', 2, 2, 1, assoc=2, tracker=self.t),
+            Store('test', 2, 2, 1, assoc=2, tracker=self.t, write_through=True),
         ]
 
     def _assert_cost(self, expected):
@@ -32,7 +32,8 @@ class TestStore(object):
         verify = self._assert_cost
 
         # store with infinite storage
-        s = Store('infinite', None, 64, cost, tracker=self.t)
+        s = Store('infinite', None, 64, cost, tracker=self.t,
+                  write_through=True)
 
         # initially tracker has no cycles
         assert 0 == self.t.get_num_cycles()
@@ -116,10 +117,11 @@ class TestStore(object):
         verify = self._assert_cost
         cost1, cost2 = 3, 7
         # infinite storage
-        s2 = Store('infinite', None, 64, cost2, tracker=self.t)
+        s2 = Store('infinite', None, 64, cost2, tracker=self.t,
+                   write_through=True)
 
         # small store of 2 blocks, each block being 2 bytes
-        s1 = Store('small', 2, 2, cost1, next_store=s2, tracker=self.t)
+        s1 = Store('small', 2, 2, cost1, next_store=s2, tracker=self.t, write_through=True)
 
         # initially tracker has no cycles
         assert 0 == self.t.get_num_cycles()

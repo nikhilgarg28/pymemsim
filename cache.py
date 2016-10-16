@@ -28,7 +28,7 @@ from .block import Block
 
 class Store(object):
     def __init__(self, name, num_blocks, block_size, num_cycles,
-                 assoc=None, write_through=True, next_store=None,
+                 assoc=None, write_through=False, next_store=None,
                  tracker=None):
         self.name = name
         self.block_size = block_size
@@ -78,7 +78,6 @@ class Store(object):
         while loop:
             _, _, offset = self._decompose(addr)
             block = self._load_block(addr)
-            buf = block.buf
 
             n_read = self.block_size - offset
             if n_read < size:
