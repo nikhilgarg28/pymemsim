@@ -1,5 +1,5 @@
 # pymemsim
-Python program to simulate the number of CPU cycles taken by a memory lookup for modern processors
+pymemsim tries to simulate memory lookups on modern processors.
 
 Many interesting programs are often bottlenecked on just the memory bandwidth.
 In such cases, processor is just waiting for memory almost all the time. This
@@ -28,5 +28,5 @@ I also hope to add the following to pymemsim over time:
 
 Please note that pymemsim is way too simplistic to come anywhere close to
 correctly simulate modern processor hardware. That's not even the goal here.
-Instead, the goal is to develop intutition on the interaction of an algorithm
-with various layers of memory lookup abstraction.
+Instead, the goal is to develop broad intutition on the interaction of an
+algorithm with various layers of memory lookup abstraction.
