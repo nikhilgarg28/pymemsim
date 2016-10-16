@@ -44,3 +44,8 @@ class Block(object):
         self._touch()
         for i, b in enumerate(buf):
             self.buf[i+offset] = buf[i]
+
+        self.dirty = True
+
+    def commit(self):
+        self.dirty = False

@@ -24,6 +24,7 @@ This is the protool for lower level stores talk to higher level stores:
 import math
 from .block import Block
 
+
 class Store(object):
     def __init__(self, name, num_blocks, block_size, num_cycles,
                  assoc=None, write_through=True, next_store=None,
@@ -139,7 +140,7 @@ class Store(object):
         inserted = False
         for i, entry in enumerate(block_list):
             tag_, _ = entry
-            if tag_ is None:
+            if tag_ is None or tag_ == tag:
                 block_list[i] = (tag, block)
                 inserted = True
                 break
@@ -150,7 +151,7 @@ class Store(object):
             block_list[index] = (tag, block)
 
         # also write to next store if in write-through mode
-        if direct and self.write_through and self.next_store is not None:
+        if direct and self.write_through:
             base = addr - offset
             self._write_block_to_next(base, block)
 
@@ -163,14 +164,16 @@ class Store(object):
 
         _, block_to_evict = block_list[best_index]
         if block_to_evict.dirty:
-            assert self.write_through
+            #assert self.write_through or (self.next_store is None)
 
-            self._write_block_to_next(block)
+            self._write_block_to_next(block.base, block)
 
         return best_index
 
     def _write_block_to_next(self, base, block):
-        self.next_store.write(base, block.buf)
+        if self.next_store is not None:
+            self.next_store.write(base, block.buf)
+        block.commit()
 
     def _read_block_from_next(self, base):
         if self.next_store is None:
