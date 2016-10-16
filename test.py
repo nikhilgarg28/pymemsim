@@ -1,5 +1,6 @@
+import random
 import pymemsim
-from pymemsim import Store
+from pymemsim import Store, memory
 
 
 class TestStore(object):
@@ -193,3 +194,46 @@ class TestStore(object):
             segfault = True
 
         assert segfault
+
+    def test_write_read_larger_than_block(self):
+        s = Store('test', 2 , 2, 1, tracker=self.t, implicit=True)
+        s.write(1, [0, 1, 2])
+        assert [0, 0, 1, 2] == s.read(0, 4)
+
+    def test_matrix_multiply(self):
+        """Tests matrix multiplication on 2 random matrices."""
+        N = 17
+        addr = lambda base, i, j: base + i * N + j
+
+        A = 0
+        B = 5000
+        R = 10000
+
+        PA = [[random.randint(0, 200) for _ in range(N)] for _ in range(N)]
+        PB = [[random.randint(0, 200) for _ in range(N)] for _ in range(N)]
+
+        # first initialize both the matrices
+        for i in range(N):
+            for j in range(N):
+                a = addr(A, i, j)
+                b = addr(B, i, j)
+                memory.write(a, [PA[i][j]])
+                memory.write(b, [PB[i][j]])
+
+        # now do their multiplication
+        for i in range(N):
+            for j in range(N):
+                total = 0
+                for k in range(N):
+                    a = addr(A, i, k)
+                    b = addr(B, k, j)
+                    total += memory.read(a, 1) * memory.read(b, 1)
+                r = addr(R, i, j)
+                memory.write(r, [total])
+
+        # now verify
+        for i in range(N):
+            for j in range(N):
+                r = addr(R, i, j)
+                expected = sum(PA[i][k] * PB[k][j] for k in range(N))
+                assert expected == memory.read(r, 1)

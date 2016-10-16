@@ -169,12 +169,16 @@ class Store(object):
         _, block_to_evict = block_list[best_index]
         if block_to_evict.dirty:
             #assert self.write_through or (self.next_store is None)
-
             self._write_block_to_next(block.base, block)
 
         return best_index
 
     def _write_block_to_next(self, base, block):
+        # TODO: since our stores are "inclusive", so that every cache line is
+        # that's present in this store is also present in next store
+        # when writing data to next store, processor doesn't have to read it again
+        # but the simulator doesn't simulate that yet, and this is one (of
+        # many) source of over-estimates
         if self.next_store is not None:
             self.next_store.write(base, block.buf)
         block.commit()
@@ -197,13 +201,15 @@ class Store(object):
             self.tracker.track(self.name, addr, read, self.num_cycles, hit)
 
     def write(self, addr, buf):
-        _, _, offset = self._decompose(addr)
-        block = self._load_block(addr)
-        offset = addr - block.base
-        block.write(offset, buf)
+        while buf:
+            block = self._load_block(addr)
+            offset = addr - block.base
+            n_write = self.block_size - offset
 
-        # this might not be required?
-        self._write_block(addr, block)
+            block.write(offset, buf[:n_write])
+            self._write_block(addr, block)
+            addr += n_write
+            buf = buf[n_write:]
 
 
 def _get_bits(addr, n_bits, to_discard):
