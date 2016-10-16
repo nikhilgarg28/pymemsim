@@ -13,6 +13,11 @@ class TestStore(object):
 
             # 2-set associative, write through, with no backing
             Store('test', 2, 2, 1, assoc=2, tracker=self.t, write_through=True),
+
+            # fully associative, write through, no backing
+            Store('test', 1, 2, 1, tracker=self.t, write_through=False),
+            # 2-set associative, write back, with no backing
+            Store('test', 2, 2, 1, assoc=2, tracker=self.t, write_through=False),
         ]
 
     def _assert_cost(self, expected):
