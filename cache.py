@@ -2,7 +2,7 @@ __doc__ = """
 
 Module that contains the core logic of hierarchical stores.
 
-This is the protool for lower level stores talk to higher level stores:
+This is the protocol for lower level stores talk to higher level stores:
 
     Read:
         check data in store
@@ -26,16 +26,19 @@ import math
 from .block import Block
 
 
+class SegFault(Exception):
+    def __init__(self, addr):
+        self.addr = addr
+
+
 class Store(object):
     def __init__(self, name, num_blocks, block_size, num_cycles,
                  assoc=None, write_through=False, next_store=None,
-                 tracker=None):
+                 tracker=None, implicit=False):
         self.name = name
         self.block_size = block_size
         self._n_offset = int(math.log2(self.block_size))
         self.num_blocks = num_blocks
-        if self.num_blocks is None:
-            assert assoc is None, 'Stores with infinite storage can not be set associative'
         self.assoc = assoc
         if assoc is None:
             self.num_sets = 1
@@ -46,10 +49,7 @@ class Store(object):
         # assuming a 64 bit address space
         self._n_tag = 64 - self._n_offset - self._n_set
 
-        if self.num_blocks is None:
-            self.num_blocks_per_set = None
-        else:
-            self.num_blocks_per_set = self.num_blocks // self.num_sets
+        self.num_blocks_per_set = self.num_blocks // self.num_sets
 
         self.num_cycles = num_cycles
 
@@ -57,18 +57,13 @@ class Store(object):
 
         self.write_through = write_through
         self.tracker = tracker
+        self.implicit = implicit
 
         self._flush()
 
     def _flush(self):
         """Remove all data from the store."""
         self._d = {}
-        for s in range(self.num_sets):
-            self._d[s] = []
-            if self.num_blocks_per_set is not None:
-                self._d[s] = [
-                    (None, None) for _ in range(self.num_blocks_per_set)
-                ]
 
     def read(self, addr, size):
         """Reads size bytes starting at address addr."""
@@ -103,6 +98,8 @@ class Store(object):
 
         tag, set_index, offset = self._decompose(addr)
 
+        if set_index not in self._d:
+            self._d[set_index] = []
         block_list = self._d[set_index]
         for tag_, block in block_list:
             if tag == tag_:
@@ -110,9 +107,11 @@ class Store(object):
                 return block
 
         # block not explicitly present, so might be a miss
-        if self.num_blocks is None:
-            # this is an infinite store, so this is not a miss
-            # we just create a new block and pretend it was a hit
+        if self.implicit and len(block_list) <= self.num_blocks_per_set:
+            # even though the addr hasn't been explicitly added to the store
+            # yet, this store is implicity known to have been zerod out
+            # so we just create a new block and store it explicitly, and
+            # pretend it was a hit
             self._track(addr, read=True, hit=True)
             base = addr - offset
             block = Block(self.block_size, base)
@@ -135,20 +134,25 @@ class Store(object):
         """Writes the block containing addr."""
         self._track(addr, read=False)
         tag, set_index, offset = self._decompose(addr)
+        if set_index not in self._d:
+            self._d[set_index] = []
         block_list = self._d[set_index]
 
         inserted = False
         for i, entry in enumerate(block_list):
             tag_, _ = entry
-            if tag_ is None or tag_ == tag:
+            if tag_ == tag:
                 block_list[i] = (tag, block)
                 inserted = True
                 break
 
         if not inserted:
-            # no empty slot, so need to evict a block
-            index = self._evict_from(block_list)
-            block_list[index] = (tag, block)
+            if len(block_list) < self.num_blocks_per_set:
+                block_list.append((tag, block))
+            else:
+                # no empty slot, so need to evict a block
+                index = self._evict_from(block_list)
+                block_list[index] = (tag, block)
 
         # also write to next store if in write-through mode
         if direct and self.write_through:
@@ -177,7 +181,7 @@ class Store(object):
 
     def _read_block_from_next(self, base):
         if self.next_store is None:
-            return Block(self.block_size, base)
+            raise SegFault(base)
         else:
             buf = self.next_store.read(base, self.block_size)
         return Block(self.block_size, base, buf)
@@ -200,6 +204,7 @@ class Store(object):
 
         # this might not be required?
         self._write_block(addr, block)
+
 
 def _get_bits(addr, n_bits, to_discard):
     addr = addr >> to_discard

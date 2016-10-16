@@ -7,18 +7,29 @@ class TestStore(object):
         self.t = pymemsim.Tracker()
 
     def get_many_stores(self):
-        return [
+        ret = [
             # fully associative, write through, no backing
-            Store('test', 1, 2, 1, tracker=self.t, write_through=True),
+            Store('test', 1, 2, 1, tracker=self.t,
+                  write_through=True, implicit=True, assoc=None),
 
             # 2-set associative, write through, with no backing
-            Store('test', 2, 2, 1, assoc=2, tracker=self.t, write_through=True),
+            Store('test', 2, 2, 1, assoc=2, tracker=self.t,
+                  write_through=True, implicit=True),
 
-            # fully associative, write through, no backing
-            Store('test', 1, 2, 1, tracker=self.t, write_through=False),
-            # 2-set associative, write back, with no backing
-            Store('test', 2, 2, 1, assoc=2, tracker=self.t, write_through=False),
+            # fully associative, write back, no backing
+            Store('test', 1, 2, 1, tracker=self.t,
+                  write_through=False, assoc=None, implicit=True),
+            # direct map, write back, with no backing
+            Store('test', 2, 2, 1, assoc=1, tracker=self.t,
+                  write_through=False, implicit=True),
         ]
+
+        # a 2 layer cache
+        s2 = Store('level 1', 1, 2, 1, tracker=self.t,
+                   write_through=False, assoc=None, implicit=True)
+        s1 = Store('level 2', 1, 2, 1, tracker=self.t,
+                   write_through=True, implicit=False, assoc=1, next_store=s2)
+        return ret + [s1]
 
     def _assert_cost(self, expected):
         actual = self.t.get_num_cycles()
@@ -37,8 +48,8 @@ class TestStore(object):
         verify = self._assert_cost
 
         # store with infinite storage
-        s = Store('infinite', None, 64, cost, tracker=self.t,
-                  write_through=True)
+        s = Store('infinite', 1 << 10, 64, cost, tracker=self.t,
+                  write_through=True, implicit=True)
 
         # initially tracker has no cycles
         assert 0 == self.t.get_num_cycles()
@@ -65,7 +76,7 @@ class TestStore(object):
         verify = self._assert_cost
         cost1, cost2 = 3, 7
         # infinite storage
-        s2 = Store('infinite', None, 64, cost2, tracker=self.t)
+        s2 = Store('infinite', 1 << 10, 64, cost2, tracker=self.t, implicit=True)
 
         # small store of 2 blocks, each block being 2 bytes
         s1 = Store('small', 2, 2, cost1, next_store=s2,
@@ -122,8 +133,8 @@ class TestStore(object):
         verify = self._assert_cost
         cost1, cost2 = 3, 7
         # infinite storage
-        s2 = Store('infinite', None, 64, cost2, tracker=self.t,
-                   write_through=True)
+        s2 = Store('infinite', 1 << 10, 64, cost2, tracker=self.t,
+                   write_through=True, implicit=True)
 
         # small store of 2 blocks, each block being 2 bytes
         s1 = Store('small', 2, 2, cost1, next_store=s2, tracker=self.t, write_through=True)
@@ -166,3 +177,19 @@ class TestStore(object):
         # level 2
         s1.write(2, [1, 2])
         verify(3*cost1 + 3*cost2)
+
+    def test_segfault(self):
+        implicit_s = Store('implicit', 1 , 2, 1, tracker=self.t, implicit=True)
+        non_implicit_s = Store('non-implicit', 1 , 2, 1,
+                               tracker=self.t, implicit=False
+                              )
+
+        assert 0 == implicit_s.read(0, 1)
+
+        segfault = False
+        try:
+            non_implicit_s.read(0, 1)
+        except pymemsim.SegFault:
+            segfault = True
+
+        assert segfault

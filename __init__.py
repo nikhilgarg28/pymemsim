@@ -1,6 +1,6 @@
 from .block import Block
 from .tracker import Tracker
-from .cache import Store
+from .cache import Store, SegFault
 
 """Returns a store analogous to L1 cache.
 
@@ -16,9 +16,9 @@ places:
 
 tracker = Tracker()
 
-# RAM : "infinite size", block size 8 byes (64 bit arch), directly mapped,
+# RAM : 4GB, block size 8 byes (64 bit arch), directly mapped,
 # refrence takes around 300 cycles
-RAM = Store('DRAM', None, 8, 300, tracker=tracker)
+RAM = Store('DRAM', 1 << 32, 8, 300, assoc=1, tracker=tracker, implicit=True)
 
 # L3 : 8MB, cache line 64B, directly mapped(?), refrence takes ~30 cycles
 L3 = Store('L3', 1 << 17, 64, 30, assoc=1, tracker=tracker, next_store=RAM)
