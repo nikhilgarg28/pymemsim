@@ -43,8 +43,8 @@ class Store(object):
             self.num_sets = num_blocks // assoc
         self._n_set = int(math.log2(self.num_sets))
 
-        # assuming a 32 bit address space
-        self._n_tag = 32 - self._n_offset - self._n_set
+        # assuming a 64 bit address space
+        self._n_tag = 64 - self._n_offset - self._n_set
 
         if self.num_blocks is None:
             self.num_blocks_per_set = None

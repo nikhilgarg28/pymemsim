@@ -2,47 +2,31 @@ from .block import Block
 from .tracker import Tracker
 from .cache import Store
 
-_t = Tracker()
-L2 = Store('L2 cache', 1 << 11, 1 << 7, 20, assoc=8, tracker=_t)
-L1 = Store('L1 cache', 64, 64, 1, tracker=_t)
+"""Returns a store analogous to L1 cache.
 
-def p_load_mem(p_addr):
-    if p_addr in L1:
-        return L1[p_addr]
+The configuration of various caches is based on information from following
+places:
 
-    if p_addr in L2:
-        L1[p_addr] = L2[p_addr]
-        return L1[p_addr]
+    Specification for various caches are mashup from the following places:
+    http://www.7-cpu.com/cpu/Haswell.html
+    https://gist.github.com/jboner/2841832
+    http://lwn.net/Articles/252125/
 
-    if p_addr in RAM:
-        L1[p_addr] = L2[p_addr] = RAM[p_addr]
-        return L1[p_addr]
+"""
 
-    #declare page fault
-    #load data from disk swap
-    #return
+tracker = Tracker()
 
-def v_load_mem(v_addr):
-    p_addr = translate_addr(v_addr)
-    return p_load_mem(p_addr)
+# RAM : "infinite size", block size 8 byes (64 bit arch), directly mapped,
+# refrence takes around 300 cycles
+RAM = Store('DRAM', None, 8, 300, tracker=tracker)
 
+# L3 : 8MB, cache line 64B, directly mapped(?), refrence takes ~30 cycles
+L3 = Store('L3', 1 << 17, 64, 30, assoc=1, tracker=tracker, next_store=RAM)
 
-def translate_addr(v_addr):
-    v_page, v_offset = split(v_addr, PAGE_SIZE)
-    p_page = translate_page(v_page)
-    return p_page + v_offset
+# L2 : 8MB, cache line 64B, 8-way, reference takes 12 cycles
+L2 = Store('L2', 1 << 12, 64, 12, assoc=8, tracker=tracker, next_store=L3)
 
-def translate_page(v_page):
-    if v_page in TLB:
-        return TLB[v_page]
+# L1 : 8MB, cache line 64B, 8-way, reference takes 12 cycles
+L1 = Store('L1', 1 << 9, 64, 4, assoc=8, tracker=tracker, next_store=L2)
 
-    pt_l1_offset, pt_l2_offset, offset = split(v_page)
-
-    pt_l1_base = p_load_mem(PGD)
-    pt_l2_base = p_load_mem(pt_l1_base + pt_l1_offset)
-    pt_l3_base = p_load_mem(pt_l2_base + pt_l2_offset)
-    return p_load_mem(pt_l3_base + offset)
-
-
-def context_switch():
-    TLB.clear()
+memory = L1
